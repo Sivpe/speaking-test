@@ -125,8 +125,7 @@
         </div>
       </div>
       <h3 class="baloo" style="font-size:21px;margin:4px 0 10px">Choose your test</h3>
-      <div id="test-list"><div class="card"><div class="testitem"><div><h3>Sample Test — My School Day</h3><div><span class="tag">Cambridge A2 Key</span><span class="meta">6B · Level A2 · 3 questions</span></div><p class="meta" style="margin:6px 0 0">A starter test so you can try the full flow: read, describe, and talk. Edit or delete it any time.</p></div><button class="btn" onclick="startTest(0)">Start</button></div></div><div class="card"><div class="testitem"><div><h3>Unit 1 Speaking Test — Be Extreme!</h3><div><span class="tag">Standard /100</span><span class="meta">9A · Level B1 · 5 questions</span></div></div><button class="btn" onclick="startTest(1)">Start</button></div></div><div class="card"><div class="testitem"><div><h3>Unit 1 Speaking Test - Be Extreme</h3><div><span class="tag">Standard /100</span><span class="meta">9A · Level B1 · 24 questions</span></div><p class="meta" style="margin:6px 0 0">Imported in full from the Go Beyond 4 Unit 1 speaking test (about 4 minutes per student). How it runs: ask 3-4 Part 1 questions, the student picks 1 Part 2 topic card (30 seconds to think, about 1.5 minutes talking, then the follow-up questions on the card), then ask 2-3 Part 3 questions. Full question banks are in this test - delete the questions you are not using for a student, or keep it as the class bank.</p></div><button class="btn" onclick="startTest(2)">Start</button></div></div></div>
-    </div>
+      <div id="test-list"><div class="card"><p>Loading your tests…</p></div></div>
 
     <div id="student-run" class="hidden">
       <div class="qhead">
@@ -252,18 +251,6 @@ window.__EMBEDDED_STATE__ = {"tests":[{"id":"builtin-beextreme5","builtin":true,
 "use strict";
 /* ================= Built-in tests ================= */
 var BUILTIN_TESTS = [
-{ id:"builtin-sample", builtin:true, title:"Sample Test — My School Day", className:"6B", level:"A2", mode:"cambridgeA2",
-  description:"A starter test so you can try the full flow: read, describe, and talk. Edit or delete it any time.",
-  questions:[
-    {type:"read_aloud", points:10, prep:15, speak:30, prompt:"Read this sentence aloud, clearly and slowly.",
-     passage:"My school is big and friendly. I go to school by bus every morning with my friends.", keywords:"", model:""},
-    {type:"describe_picture", points:10, prep:20, speak:45, prompt:"Describe the picture. What can you see? What are the children doing?",
-     scene:"🏫 🎒 📚 ✏️ 🚌", keywords:"school, children, teacher, books, happy",
-     model:"In the picture I can see a school. Some children are carrying books and bags. They look happy."},
-    {type:"free_speaking", points:10, prep:30, speak:60, prompt:"Talk about your school day. What time do you get up? How do you go to school? What is your favourite subject?",
-     keywords:"get up, breakfast, bus, favourite subject, because",
-     model:"I get up at six o'clock. I have breakfast and go to school by bus. My favourite subject is English because it is fun."}
-  ]},
 { id:"builtin-beextreme5", builtin:true, title:"Unit 1 Speaking Test — Be Extreme!", className:"9A", level:"B1", mode:"standard",
   description:"",
   questions:[
