@@ -107,14 +107,14 @@
 <body>
 <div class="wrap">
   <div class="topbar" role="tablist">
-    <button id="tab-student" class="" onclick="showTab('student')">🎤 Student</button>
+    <button id="tab-student" class="on" onclick="showTab('student')">🎤 Student</button>
     <button id="tab-teacher" onclick="showTab('teacher')">🍎 Teacher</button>
     <button id="tab-results" onclick="showTab('results')">📊 Results</button>
-    <button id="tab-download" onclick="showTab('download')" class="on">⬇️ Download</button>
+    <button id="tab-download" onclick="showTab('download')">⬇️ Download</button>
   </div>
 
   <!-- ================= STUDENT ================= -->
-  <section id="view-student" class="hidden">
+  <section id="view-student" class="">
     <div id="student-home">
       <div class="card">
         <h2>SP Speaking Test</h2>
@@ -136,6 +136,7 @@
       </div>
       <h3 class="baloo" style="font-size:21px;margin:4px 0 10px">Choose your test</h3>
       <div id="test-list"><div class="card"><p>Loading your tests…</p></div></div>
+    </div>
 
     <div id="student-run" class="hidden">
       <div class="qhead">
@@ -147,6 +148,7 @@
         <div class="ex-main">
           <div class="ex-name">🎙️ Muse — your speaking examiner</div>
           <div class="ex-bubble" id="ex-bubble">…</div>
+          <audio id="ex-audio" preload="auto" style="display:none"></audio>
           <div class="ex-btns">
             <button class="btn ghost small" onclick="replaySpeech()">🔊 Hear it again</button>
             <button class="btn ghost small" id="voice-toggle" onclick="toggleVoice()">🔊 Voice: On</button>
@@ -247,7 +249,7 @@
   </section>
 
   <!-- ================= DOWNLOAD ================= -->
-  <section id="view-download" class="">
+  <section id="view-download" class="hidden">
     <div class="card">
       <h2>Use in Chrome (outside Muse)</h2>
       <p class="sub" style="margin-bottom:10px">Recording works best when this page is the top page in Chrome. Download one file with your tests inside it, then open that file in Chrome on any computer or phone. No API key is needed anywhere — Muse scores in chat.</p>
@@ -454,13 +456,33 @@ function cleanForSpeech(t){
 }
 function setBubble(text){ var b = $("ex-bubble"); if(b) b.textContent = text; }
 function stopSpeechAudio(){
+  var au = $("ex-audio"); if(au){ try{ au.pause(); }catch(e){} }
   if("speechSynthesis" in window){ try{ speechSynthesis.cancel(); }catch(e){} }
   var e = $("examiner"); if(e) e.classList.remove("speaking");
 }
-function speak(text){
-  currentSpeechText = text; setBubble(text);
+var currentAudioKey = "";
+function speak(text, audioKey){
+  currentSpeechText = text; currentAudioKey = audioKey || ""; setBubble(text);
   stopSpeechAudio();
-  if(!voiceOn || !("speechSynthesis" in window)) return;
+  if(!voiceOn) return;
+  var bar = $("examiner");
+  if(audioKey){
+    var au = $("ex-audio");
+    if(au){
+      au.src = "audio/" + audioKey + ".mp3";
+      au.onplaying = function(){ if(bar) bar.classList.add("speaking"); };
+      au.onended = function(){ if(bar) bar.classList.remove("speaking"); };
+      au.onerror = function(){ speakTTS(text); };
+      var p = au.play();
+      if(p && p.catch) p.catch(function(){ speakTTS(text); });
+      return;
+    }
+  }
+  speakTTS(text);
+}
+function speakTTS(text){
+  if(window.mediaRecorder && mediaRecorder.state === "recording") return;
+  if(!("speechSynthesis" in window)) return;
   try{
     var u = new SpeechSynthesisUtterance(text);
     u.lang = "en-GB"; u.rate = 0.98; u.pitch = 1.05;
@@ -471,17 +493,16 @@ function speak(text){
     speechSynthesis.speak(u);
   }catch(e){}
 }
-function replaySpeech(){ if(currentSpeechText) speak(currentSpeechText); }
+function replaySpeech(){ if(currentSpeechText) speak(currentSpeechText, currentAudioKey); }
 function toggleVoice(){
   voiceOn = !voiceOn; lsSet("sp_voice", voiceOn);
   var b = $("voice-toggle"); if(b) b.textContent = voiceOn ? "🔊 Voice: On" : "🔇 Voice: Off";
-  if(!voiceOn) stopSpeechAudio(); else if(currentSpeechText) speak(currentSpeechText);
+  if(!voiceOn) stopSpeechAudio(); else if(currentSpeechText) speak(currentSpeechText, currentAudioKey);
 }
 function showIntro(){
   var t = run.test;
   var total = t.questions.reduce(function(a, q){ return a + (+q.points || 0); }, 0);
-  var first = run.name.split(" ")[0];
-  var intro = "Hello " + first + "! I'm Muse, your speaking examiner. This is the " + t.title + ". " +
+  var intro = "Hello! I'm Muse, your speaking examiner. This is the " + t.title + ". " +
     (t.description ? cleanForSpeech(t.description) + " " : "") +
     "You will answer " + t.questions.length + " questions, for " + total + " points. " +
     "I will ask each question out loud, and you can read it on the screen too. Listen, think about your answer, then tap Record and speak. Good luck!";
@@ -493,7 +514,7 @@ function showIntro(){
     '<div class="qprompt" style="text-align:left">' + esc(intro) + '</div>' +
     '<button class="btn orange" style="margin-top:14px" onclick="showQuestion()">Start the test ▶</button></div>';
   setAvatarImgs();
-  speak(intro);
+  speak(intro, run.test.builtin ? run.test.id + "-intro" : "");
 }
 function speakQuestion(){
   if(!run) return;
@@ -504,7 +525,7 @@ function speakQuestion(){
   } else {
     text = "Question " + (run.qi + 1) + ". " + cleanForSpeech(q.prompt);
   }
-  speak(text);
+  speak(text, run.test.builtin ? run.test.id + "-q" + (run.qi + 1) : "");
 }
 
 function startTest(i){
@@ -1336,7 +1357,7 @@ function downloadStandalone(){
 }
 
 /* Init */
-renderTestList();
+showTab("student");
 </script>
 
 
