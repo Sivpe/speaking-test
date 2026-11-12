@@ -92,6 +92,16 @@
   .kbd-hint{font-size:13.5px;color:var(--muted)}
   .attempt{padding:12px 0;border-bottom:1px solid var(--line)}
   .attempt .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+
+.examiner{display:flex;gap:12px;align-items:flex-start;background:#fff7ea;border:2px solid #ffd9a0;border-radius:16px;padding:10px 12px;margin-bottom:12px}
+.ex-avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;border:3px solid #ffb35c;flex:0 0 auto;background:#fff}
+.examiner.speaking .ex-avatar{animation:expulse 1s ease-in-out infinite;border-color:#ff8a3d}
+@keyframes expulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.ex-main{flex:1;min-width:0}
+.ex-name{font-weight:700;font-size:14px}
+.ex-bubble{background:#fff;border-radius:12px;padding:8px 10px;font-size:15px;margin-top:4px;line-height:1.45}
+.ex-btns{margin-top:8px;display:flex;gap:8px;flex-wrap:wrap}
+.ex-intro-avatar{width:110px;height:110px;border-radius:50%;object-fit:cover;border:4px solid #ffb35c}
 </style>
 </head>
 <body>
@@ -108,7 +118,7 @@
     <div id="student-home">
       <div class="card">
         <h2>SP Speaking Test</h2>
-        <p class="sub">Write your name, choose your test, and record your answers. Your teacher sends your answers to <b>Muse</b>, who listens, gives your points and writes your feedback. Your score appears in Results after your teacher imports it — it is not scored instantly in this page.</p>
+        <p class="sub">Write your name, choose your test, and record your answers. Muse, your examiner, will read each question out loud while you follow it on the screen. Your teacher sends your answers to <b>Muse</b>, who listens, gives your points and writes your feedback. Your score appears in Results after your teacher imports it — it is not scored instantly in this page.</p>
         <label for="stu-name">Your full name</label>
         <input type="text" id="stu-name" placeholder="e.g. Sok Dara" autocomplete="name">
         <label for="stu-class">Your class</label>
@@ -131,6 +141,17 @@
       <div class="qhead">
         <span class="meta" id="run-meta"></span>
         <button class="btn ghost small" onclick="exitRun()">Exit test</button>
+      </div>
+      <div class="examiner hidden" id="examiner">
+        <img class="ex-avatar ex-av" alt="Muse, your examiner">
+        <div class="ex-main">
+          <div class="ex-name">🎙️ Muse — your speaking examiner</div>
+          <div class="ex-bubble" id="ex-bubble">…</div>
+          <div class="ex-btns">
+            <button class="btn ghost small" onclick="replaySpeech()">🔊 Hear it again</button>
+            <button class="btn ghost small" id="voice-toggle" onclick="toggleVoice()">🔊 Voice: On</button>
+          </div>
+        </div>
       </div>
       <div class="progress"><i id="run-bar" style="width:0%"></i></div>
       <div class="card" id="run-card"></div>
@@ -418,6 +439,74 @@ var run = null; // {test, name, className, qi, answers:[], currentBlob, currentD
 var mediaRecorder = null, mediaStream = null, recChunks = [], recStart = 0, recTimer = null, prepTimer = null;
 var recognition = null;
 
+/* ================= Muse the examiner (avatar + voice) ================= */
+var EXAMINER_AVATAR = "data:image/jpeg;base64,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";
+var voiceOn = lsGet("sp_voice", true) !== false;
+var currentSpeechText = "";
+if("speechSynthesis" in window){ try{ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); }; }catch(e){} }
+function setAvatarImgs(){ document.querySelectorAll(".ex-av").forEach(function(im){ im.src = EXAMINER_AVATAR; }); }
+function cleanForSpeech(t){
+  return String(t || "")
+    .replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'")
+    .replace(/^\s*\d+\s*[.)]\s*/, "")
+    .replace(/[\u2022\u00b7]/g, ",")
+    .replace(/\s*\n+\s*/g, ". ").replace(/\s{2,}/g, " ").trim();
+}
+function setBubble(text){ var b = $("ex-bubble"); if(b) b.textContent = text; }
+function stopSpeechAudio(){
+  if("speechSynthesis" in window){ try{ speechSynthesis.cancel(); }catch(e){} }
+  var e = $("examiner"); if(e) e.classList.remove("speaking");
+}
+function speak(text){
+  currentSpeechText = text; setBubble(text);
+  stopSpeechAudio();
+  if(!voiceOn || !("speechSynthesis" in window)) return;
+  try{
+    var u = new SpeechSynthesisUtterance(text);
+    u.lang = "en-GB"; u.rate = 0.98; u.pitch = 1.05;
+    var vs = speechSynthesis.getVoices().filter(function(v){ return /^en/i.test(v.lang); });
+    if(vs.length){ u.voice = vs.filter(function(v){ return /en[-_]GB/i.test(v.lang); })[0] || vs[0]; }
+    u.onstart = function(){ var e = $("examiner"); if(e) e.classList.add("speaking"); };
+    u.onend = u.onerror = function(){ var e = $("examiner"); if(e) e.classList.remove("speaking"); };
+    speechSynthesis.speak(u);
+  }catch(e){}
+}
+function replaySpeech(){ if(currentSpeechText) speak(currentSpeechText); }
+function toggleVoice(){
+  voiceOn = !voiceOn; lsSet("sp_voice", voiceOn);
+  var b = $("voice-toggle"); if(b) b.textContent = voiceOn ? "🔊 Voice: On" : "🔇 Voice: Off";
+  if(!voiceOn) stopSpeechAudio(); else if(currentSpeechText) speak(currentSpeechText);
+}
+function showIntro(){
+  var t = run.test;
+  var total = t.questions.reduce(function(a, q){ return a + (+q.points || 0); }, 0);
+  var first = run.name.split(" ")[0];
+  var intro = "Hello " + first + "! I'm Muse, your speaking examiner. This is the " + t.title + ". " +
+    (t.description ? cleanForSpeech(t.description) + " " : "") +
+    "You will answer " + t.questions.length + " questions, for " + total + " points. " +
+    "I will ask each question out loud, and you can read it on the screen too. Listen, think about your answer, then tap Record and speak. Good luck!";
+  $("run-meta").textContent = t.title;
+  $("run-bar").style.width = "0%";
+  $("run-card").innerHTML =
+    '<div class="center"><img class="ex-intro-avatar ex-av" alt="Muse, your examiner">' +
+    '<h3 style="margin:10px 0 4px">🎙️ Muse — your speaking examiner</h3>' +
+    '<div class="qprompt" style="text-align:left">' + esc(intro) + '</div>' +
+    '<button class="btn orange" style="margin-top:14px" onclick="showQuestion()">Start the test ▶</button></div>';
+  setAvatarImgs();
+  speak(intro);
+}
+function speakQuestion(){
+  if(!run) return;
+  var q = run.test.questions[run.qi];
+  var text;
+  if(q.type === "read_aloud"){
+    text = "Question " + (run.qi + 1) + ". Please read the passage on the screen out loud. Read slowly and clearly.";
+  } else {
+    text = "Question " + (run.qi + 1) + ". " + cleanForSpeech(q.prompt);
+  }
+  speak(text);
+}
+
 function startTest(i){
   var name = $("stu-name").value.trim();
   if(!name){ alert2("Write your full name first.", true); $("stu-name").focus(); return; }
@@ -426,9 +515,12 @@ function startTest(i){
   $("student-home").classList.add("hidden");
   $("student-done").classList.add("hidden");
   $("student-run").classList.remove("hidden");
-  showQuestion();
+  $("examiner").classList.remove("hidden");
+  var vt = $("voice-toggle"); if(vt) vt.textContent = voiceOn ? "🔊 Voice: On" : "🔇 Voice: Off";
+  setAvatarImgs();
+  showIntro();
 }
-function exitRun(){ stopAllTimers(); stopStream(); run = null;
+function exitRun(){ stopAllTimers(); stopStream(); stopSpeechAudio(); run = null; $("examiner").classList.add("hidden");
   $("student-run").classList.add("hidden"); $("student-done").classList.add("hidden"); $("student-home").classList.remove("hidden"); renderTestList(); }
 function stopAllTimers(){ if(recTimer){clearInterval(recTimer); recTimer=null;} if(prepTimer){clearInterval(prepTimer); prepTimer=null;} }
 function stopStream(){ if(mediaStream){ mediaStream.getTracks().forEach(function(t){ t.stop(); }); mediaStream=null; } if(recognition){ try{ recognition.stop(); }catch(e){} recognition=null; } }
@@ -458,6 +550,7 @@ function showQuestion(){
     prepTimer = setInterval(function(){ left--; var n = $("prep-num"); if(!n){ stopAllTimers(); return; }
       if(left<=0){ stopAllTimers(); beginAnswer(); } else { n.textContent = left; } }, 1000);
   } else { beginAnswer(); }
+  speakQuestion();
 }
 function beginAnswer(){
   stopAllTimers();
@@ -487,6 +580,7 @@ function toggleRecord(){
   startRecording();
 }
 function startRecording(){
+  stopSpeechAudio();
   var q = run.test.questions[run.qi];
   navigator.mediaDevices.getUserMedia({ audio: true }).then(function(stream){
     mediaStream = stream; recChunks = [];
@@ -552,6 +646,7 @@ function pickUpload(){ $("up-file").click(); }
 
 /* Voice typing backup (browser speech recognition) */
 function toggleVoiceTyping(){
+  stopSpeechAudio();
   var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
   var out = $("voice-out");
   if(!SR){ out.innerHTML = '<div class="note"><b>Voice typing is not available in this browser.</b> Use Chrome, or Upload a recording instead.</div>'; return; }
@@ -604,7 +699,7 @@ function saveAnswerAndNext(){
 }
 
 function finishAttempt(){
-  stopAllTimers(); stopStream();
+  stopAllTimers(); stopStream(); stopSpeechAudio();
   var attempt = {
     id: newId("att"), date: new Date().toISOString(),
     student: run.name, className: run.className,
