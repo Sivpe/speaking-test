@@ -144,7 +144,7 @@
         <button class="btn ghost small" onclick="exitRun()">Exit test</button>
       </div>
       <div class="examiner hidden" id="examiner">
-        <img class="ex-avatar ex-av" alt="Muse, your examiner">
+        <canvas class="ex-avatar ex-av" width="240" height="240" role="img" aria-label="Your examiner"></canvas>
         <div class="ex-main">
           <div class="ex-name">🎙️ Muse — your speaking examiner</div>
           <div class="ex-bubble" id="ex-bubble">…</div>
@@ -450,7 +450,86 @@ function examinerAvatar(){ if(window.run && run.test && EXAMINER_MALE_TESTS[run.
 var voiceOn = lsGet("sp_voice", true) !== false;
 var currentSpeechText = "";
 if("speechSynthesis" in window){ try{ speechSynthesis.getVoices(); speechSynthesis.onvoiceschanged = function(){ speechSynthesis.getVoices(); }; }catch(e){} }
-function setAvatarImgs(){ document.querySelectorAll(".ex-av").forEach(function(im){ im.src = examinerAvatar(); }); }
+/* ---- Live examiner avatar: the teacher photo blinks, and the mouth moves
+   in a speech rhythm while the examiner is speaking (the page's .speaking state). ---- */
+var EX_FACE = {
+  M: { eyes: [[94, 50], [146, 50]], eyeW: 19, eyeH: 8, mouth: [120, 92], mouthW: 38, mouthH: 14 },
+  F: { eyes: [[105, 86], [145, 84]], eyeW: 16, eyeH: 7, mouth: [131, 124], mouthW: 34, mouthH: 13 }
+};
+var exImg = null, exImgKey = "", exRaf = null, exMouth = 0, exMouthTarget = 0, exNextSyl = 0, exPauseUntil = 0, exNextPause = 0, exBlinkAt = 0, exBlinkStart = -1;
+function exGender(){ return (window.run && run.test && EXAMINER_MALE_TESTS[run.test.id]) ? "M" : "F"; }
+function setAvatarImgs(){
+  var key = exGender();
+  if(key !== exImgKey || !exImg){
+    exImgKey = key;
+    var im = new Image();
+    im.onload = function(){ exImg = im; exDraw(0); };
+    im.src = key === "M" ? EXAMINER_AVATAR_M : EXAMINER_AVATAR_F;
+  }
+  if(!exRaf) exLoop();
+}
+function exDraw(t){
+  if(!exImg) return;
+  var face = EX_FACE[exImgKey];
+  var speaking = false;
+  var bar = document.getElementById("examiner");
+  if(bar && bar.classList.contains("speaking")) speaking = true;
+  /* mouth pattern: syllable-like targets while speaking, closed at rest */
+  if(speaking){
+    if(t >= exNextPause && exPauseUntil === 0){ exPauseUntil = t + 110 + Math.random() * 90; exNextPause = t + 900 + Math.random() * 1400; }
+    if(exPauseUntil && t >= exPauseUntil) exPauseUntil = 0;
+    if(exPauseUntil) exMouthTarget = 0;
+    else if(t >= exNextSyl){ exMouthTarget = Math.random() < 0.16 ? 0.05 : 0.3 + Math.random() * 0.7; exNextSyl = t + 85 + Math.random() * 95; }
+  } else exMouthTarget = 0;
+  exMouth += (exMouthTarget - exMouth) * 0.45;
+  if(exMouth < 0.01) exMouth = exMouthTarget === 0 ? 0 : exMouth;
+  /* blink scheduling */
+  if(exBlinkAt === 0) exBlinkAt = t + 1600 + Math.random() * 2200;
+  if(t >= exBlinkAt && exBlinkStart < 0){ exBlinkStart = t; exBlinkAt = t + 2400 + Math.random() * 2600; }
+  var blink = 0;
+  if(exBlinkStart >= 0){
+    var bp = (t - exBlinkStart) / 150;
+    if(bp >= 1){ exBlinkStart = -1; } else blink = Math.sin(bp * Math.PI);
+  }
+  document.querySelectorAll("canvas.ex-av").forEach(function(cv){
+    var ctx = cv.getContext("2d");
+    ctx.clearRect(0, 0, 240, 240);
+    ctx.drawImage(exImg, 0, 0, 240, 240);
+    /* mouth: warp the mouth strip open + a soft oral cavity */
+    if(exMouth > 0.02){
+      var mx = face.mouth[0], my = face.mouth[1], mw = face.mouthW, mh = face.mouthH;
+      var open = exMouth * 11;
+      ctx.drawImage(exImg, mx - mw / 2, my - 2, mw, mh, mx - mw / 2, my - 2, mw, mh + open);
+      ctx.save();
+      ctx.beginPath();
+      ctx.ellipse(mx, my + 3 + open * 0.35, mw * 0.30, Math.max(0.6, open * 0.5), 0, 0, Math.PI * 2);
+      ctx.fillStyle = "rgba(74,30,26,0.85)";
+      ctx.fill();
+      ctx.restore();
+    }
+    /* blink: skin-tone lid over each eye (colour sampled above the eye) */
+    if(blink > 0.03){
+      face.eyes.forEach(function(e){
+        var sx = Math.max(0, Math.min(239, e[0])), sy = Math.max(0, e[1] - face.eyeH * 2);
+        var px = ctx.getImageData(sx, sy, 1, 1).data;
+        ctx.save();
+        ctx.beginPath();
+        ctx.ellipse(e[0], e[1], face.eyeW * 0.62, face.eyeH * 0.95 * blink + 0.4, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgb(" + px[0] + "," + px[1] + "," + px[2] + ")";
+        ctx.fill();
+        ctx.beginPath();
+        ctx.ellipse(e[0], e[1] + face.eyeH * 0.42 * blink, face.eyeW * 0.55, 0.8, 0, 0, Math.PI * 2);
+        ctx.fillStyle = "rgba(60,40,30,0.35)";
+        ctx.fill();
+        ctx.restore();
+      });
+    }
+  });
+}
+function exLoop(){
+  var step = function(t){ exDraw(t); exRaf = requestAnimationFrame(step); };
+  exRaf = requestAnimationFrame(step);
+}
 function cleanForSpeech(t){
   return String(t || "")
     .replace(/[\u201c\u201d]/g, '"').replace(/[\u2018\u2019]/g, "'")
@@ -513,7 +592,7 @@ function showIntro(){
   $("run-meta").textContent = t.title;
   $("run-bar").style.width = "0%";
   $("run-card").innerHTML =
-    '<div class="center"><img class="ex-intro-avatar ex-av" alt="Muse, your examiner">' +
+    '<div class="center"><canvas class="ex-intro-avatar ex-av" width="240" height="240" role="img" aria-label="Your examiner"></canvas>' +
     '<h3 style="margin:10px 0 4px">🎙️ Muse — your speaking examiner</h3>' +
     '<div class="qprompt" style="text-align:left">' + esc(intro) + '</div>' +
     '<button class="btn orange" style="margin-top:14px" onclick="showQuestion()">Start the test ▶</button></div>';
